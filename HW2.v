@@ -36,22 +36,46 @@ module ALU(
 
     // Todo 5: Wire assignments
     
-    // Combinational always block
+    // Combinational always block // use "=" instead of "<=" in  always @(*) begin
     // Todo 1: Next-state logic of state machine
     always @(*) begin
         case(state)
             IDLE: begin
-
+                if(!valid) state_nxt = IDLE; 
+                else begin
+                    case(mode)
+                        2'd0: state_nxt = MUL;
+                        2'd1: state_nxt = DIV;
+                        2'd2: state_nxt = SHIFT;
+                        2'd3: state_nxt = AVG;
+                        default: state_nxt = IDLE;
+                    endcase
+                end
             end
-            MUL :
-            DIV :
-            SHIFT :
-            AVG : 
+            MUL : begin
+                if(counter == 5'd31) state_nxt = OUT;
+                else state_nxt = MUL;
+            end
+            DIV : begin
+                if(counter == 5'd31) state_nxt = OUT;
+                else state_nxt = DIV;
+            end
+            SHIFT : state_nxt = OUT;
+            AVG : state_nxt = OUT;
             OUT : state_nxt = IDLE;
-            default :
+            default : state_nxt = IDLE;
         endcase
     end
     // Todo 2: Counter
+    // Counter counts from 0 to 31 when the state is MUL or DIV
+    // Otherwise, keep it zero
+    always @(*) begin
+        if((state == MUL || state == DIV) && counter_nxt < 5'd32) begin
+            counter_nxt = counter + 1;
+        end
+        else counter_nxt = 0;
+    end
+
     
     // ALU input
     always @(*) begin
@@ -66,6 +90,27 @@ module ALU(
     end
 
     // Todo 3: ALU output
+    always @(*) begin
+        case(state):
+            MUL: begin
+                
+            end
+            DIV: begin
+
+            end
+            SHIFT: begin
+
+            end
+            AVG: begin
+                
+            end  
+            OUT: begin
+
+            end
+            default: begin
+            end
+        endcase
+    end
     
     // Todo 4: Shift register
 
@@ -73,9 +118,11 @@ module ALU(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state <= IDLE;
+            counter <= 0;
         end
         else begin
             state <= state_nxt;
+            counter <= counter_nxt;
         end
     end
 
