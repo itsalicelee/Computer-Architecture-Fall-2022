@@ -30,9 +30,9 @@ module ALU(
     reg  [ 4:0] counter, counter_nxt;
     reg  [63:0] shreg, shreg_nxt;
     reg  [31:0] alu_in, alu_in_nxt;
-    reg  [32:0] alu_out;
-
+    reg  [32:0] alu_out;  // it's not a real register, it's wire!
     // Todo: Instatiate any primitives if needed
+    reg         dividend_flag;
 
     // Todo 5: Wire assignments
     
@@ -89,40 +89,96 @@ module ALU(
         endcase
     end
 
-    // Todo 3: ALU output
+    // Todo 3: ALU output & dividend flag
     always @(*) begin
+        alu_out = 0;
+        dividend_flag = 0;
         case(state):
             MUL: begin
-                
+                if(shreg[0] == 1) begin
+                    alu_out = shreg[63:32] + alu_in;
+                    // $signed(in_A) + $signed(in_B)
+                end
+                else begin
+                    alu_out = shreg[63:32];
+                end
             end
             DIV: begin
-
+                // if remainder goes < 0, add divisor back
+                dividend_flag = (shreg[63:32] >= in_B);
+                if(dividend_flag) begin
+                    alu_out = shreg[63:32] - in_B;
+                end 
+                else begin
+                    alu_out = shreg[63:32];
+                end
             end
             SHIFT: begin
-
+                alu_out = in_A >> in_B[2:0];
             end
             AVG: begin
-                
+                alu_out = (in_A + in_B) >> 1;
+            end  
+        endcase
+    end
+    
+    // Todo 4: Shift register
+    always @(*) begin
+        case(state):
+            IDLE: begin
+                if(!valid) shreg = 0; 
+                else begin
+                    case(mode)
+                        2'd0: begin
+                            shreg_nxt = {{32{1'b0}}, in_B};
+                        end
+                        2'd1: begin
+                            //TODO:                            
+                        end
+                        2'd2: begin
+                            // TODO:
+                        end
+                        2'd3: begin
+                            // TODO:                      
+                        end
+                        default: begin
+                            // TODO:
+                        end
+                    endcase
+                end
+            end
+            MUL: begin
+                shreg_nxt = {alu_out, shreg[31:1]};
+            end
+            DIV: begin
+                shreg = {32'b0, in_A};
+            end
+            SHIFT: begin
+                shreg = {32'b0, in_A >> in_B[2:0]};
+            end
+            AVG: begin
+                shreg = {32'b0, in_A};
+                shreg_nxt = (shreg << 2);
             end  
             OUT: begin
-
+                
             end
             default: begin
             end
         endcase
     end
-    
-    // Todo 4: Shift register
 
     // Todo: Sequential always block
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state <= IDLE;
             counter <= 0;
+            shreg <= 0;
         end
         else begin
             state <= state_nxt;
             counter <= counter_nxt;
+            shreg <= shreg_nxt;
         end
     end
 
