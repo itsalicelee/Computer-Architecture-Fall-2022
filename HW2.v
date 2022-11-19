@@ -32,9 +32,31 @@ module ALU(
     reg  [31:0] alu_in, alu_in_nxt;
     reg  [32:0] alu_out;  // it's not a real register, it's wire!
     // Todo: Instatiate any primitives if needed
-    reg         dividend_flag;
-
+    reg         dividend_flag;  // it's not a real register, it's wire!
+    reg         rdy, rdy_nxt;
     // Todo 5: Wire assignments
+    assign out = shreg;
+    assign ready = rdy;
+    
+    always @(*) begin
+        case(state)
+            IDLE: begin
+               rdy_nxt = 0;
+            end
+            MUL : begin
+                if(counter == 5'd31) rdy_nxt = 1;
+                else rdy_nxt = 0;
+            end
+            DIV : begin
+                if(counter == 5'd31) rdy_nxt = 1;
+                else rdy_nxt = 0;
+            end
+            SHIFT : rdy_nxt = 1;
+            AVG : rdy_nxt = 1;
+            OUT : rdy_nxt = 0;
+            default : rdy_nxt = 0;
+        endcase
+    end
     
     // Combinational always block // use "=" instead of "<=" in  always @(*) begin
     // Todo 1: Next-state logic of state machine
@@ -70,7 +92,7 @@ module ALU(
     // Counter counts from 0 to 31 when the state is MUL or DIV
     // Otherwise, keep it zero
     always @(*) begin
-        if((state == MUL || state == DIV) && counter_nxt < 5'd32) begin
+        if(state == MUL || state == DIV) begin
             counter_nxt = counter + 1;
         end
         else counter_nxt = 0;
@@ -93,7 +115,7 @@ module ALU(
     always @(*) begin
         alu_out = 0;
         dividend_flag = 0;
-        case(state):
+        case(state)
             MUL: begin
                 if(shreg[0] == 1) begin
                     alu_out = shreg[63:32] + alu_in;
@@ -105,65 +127,69 @@ module ALU(
             end
             DIV: begin
                 // if remainder goes < 0, add divisor back
-                dividend_flag = (shreg[63:32] >= in_B);
+                dividend_flag = (shreg[63:32] >= alu_in);
                 if(dividend_flag) begin
-                    alu_out = shreg[63:32] - in_B;
+                    alu_out = shreg[63:32] - alu_in;
                 end 
                 else begin
                     alu_out = shreg[63:32];
                 end
             end
             SHIFT: begin
-                alu_out = in_A >> in_B[2:0];
+                alu_out = shreg[31:0] >> alu_in[2:0];
             end
             AVG: begin
-                alu_out = (in_A + in_B) >> 1;
+                alu_out = (shreg[31:0] + alu_in) >> 1;
             end  
         endcase
     end
     
     // Todo 4: Shift register
     always @(*) begin
-        case(state):
+        case(state)
             IDLE: begin
-                if(!valid) shreg = 0; 
+                if(!valid) shreg_nxt = 0; 
                 else begin
-                    case(mode)
-                        2'd0: begin
-                            shreg_nxt = {{32{1'b0}}, in_B};
-                        end
-                        2'd1: begin
-                            //TODO:                            
-                        end
-                        2'd2: begin
-                            // TODO:
-                        end
-                        2'd3: begin
-                            // TODO:                      
-                        end
-                        default: begin
-                            // TODO:
-                        end
-                    endcase
+                    if(mode == 2'd1)begin
+                        shreg_nxt = {{31{1'b0}}, in_A, {1'b0}}; 
+                    end
+                    else begin
+                        shreg_nxt = {{32{1'b0}}, in_A};
+                    end
                 end
             end
             MUL: begin
                 shreg_nxt = {alu_out, shreg[31:1]};
             end
             DIV: begin
-                shreg = {32'b0, in_A};
+                if(counter == 31)begin
+                    if(dividend_flag)begin
+                        shreg_nxt = {alu_out[31:0], shreg[30:0], {1'b1}};
+                    end
+                    else begin
+                        shreg_nxt = {alu_out[31:0], shreg[30:0], {1'b0}};
+                    end
+                end
+                else begin
+                    if(dividend_flag)begin
+                        shreg_nxt = {alu_out[30:0], shreg[31:0], {1'b1}};
+                    end
+                    else begin
+                        shreg_nxt = {alu_out[30:0], shreg[31:0], {1'b0}};
+                    end
+                end
             end
             SHIFT: begin
-                shreg = {32'b0, in_A >> in_B[2:0]};
+                shreg_nxt = {32'b0, alu_out[31:0]};
             end
             AVG: begin
-                shreg = {32'b0, in_A};
-                shreg_nxt = (shreg << 2);
+                shreg_nxt = {32'b0, alu_out[31:0]};
             end  
             OUT: begin
-                
+                shreg_nxt = shreg;
             end
             default: begin
+                shreg_nxt = shreg;
             end
         endcase
     end
@@ -174,11 +200,15 @@ module ALU(
             state <= IDLE;
             counter <= 0;
             shreg <= 0;
+            alu_in <= 0;
+            rdy <= 0;
         end
         else begin
             state <= state_nxt;
             counter <= counter_nxt;
             shreg <= shreg_nxt;
+            alu_in <= alu_in_nxt;
+            rdy <= rdy_nxt;
         end
     end
 
